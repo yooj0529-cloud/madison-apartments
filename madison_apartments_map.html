@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Madison 아파트 후보 지도 (10곳)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --gold: #f59e0b;
+    --blue: #2563eb;
+    --red: #dc2626;
+    --green: #16a34a;
+    --bg: #f7f8fa;
+    --card: #fff;
+    --border: #e4e7eb;
+    --text: #1f2937;
+    --muted: #6b7280;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: var(--text); }
+  #wrap { display: flex; height: 100vh; }
+  #map { flex: 1; height: 100%; }
+  #side { width: 420px; overflow-y: auto; padding: 16px; background: var(--bg); border-left: 1px solid var(--border); }
+  h1 { margin: 0 0 6px; font-size: 18px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 12px; line-height: 1.45; }
+  .legend { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #888; }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+  .btn:hover { background: #eff6ff; border-color: #93c5fd; }
+  .btn.active { background: #1f4e78; color: #fff; border-color: #1f4e78; }
+  .item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; margin-bottom: 8px; font-size: 13px; cursor: pointer; transition: 0.15s; }
+  .item:hover { background: #eff6ff; border-color: #79b7ff; }
+  .item .name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .item .badge { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+  .item .meta { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  .item .vibe { font-size: 11.5px; color: #444; margin-top: 5px; }
+  .gold { background: #fff8e6 !important; border-color: #f3c44b !important; }
+  .gold-badge { background: var(--gold); color: #1a1a1a; }
+  .warn-badge { background: var(--red); color: #fff; }
+  .ok-badge { background: var(--blue); color: #fff; }
+  .pin-num {
+    background: var(--blue); color: #fff; border: 2px solid #fff;
+    border-radius: 50%; width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 13px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .pin-num.gold { background: var(--gold); color: #1a1a1a; }
+  .pin-num.warn { background: var(--red); }
+  .pin-school {
+    background: var(--green); color: #fff; border: 3px solid #fff;
+    border-radius: 50%; width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .leaflet-popup-content { margin: 12px 14px; line-height: 1.45; max-height: 380px; overflow-y: auto; }
+  .pop-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+  .pop-addr { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+  .pop-row { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; margin: 2px 0; }
+  .pop-row b { color: #444; }
+  .pop-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; font-size: 12px; }
+  .pop-section h4 { margin: 0 0 4px; font-size: 12.5px; color: #1f4e78; }
+  .pop-link { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--blue); text-decoration: none; }
+  .pop-link:hover { text-decoration: underline; }
+  .tag { display: inline-block; background: #eef; color: #335; padding: 1px 6px; border-radius: 8px; font-size: 10.5px; margin: 2px 3px 2px 0; }
+  .tag.warn { background: #fee; color: #933; }
+  .tag.good { background: #efe; color: #265; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map"></div>
+  <div id="side">
+    <h1>🏠 Madison 아파트 후보</h1>
+    <div class="sub">통학지: <b>Dept. of Soil Science</b><br>1525 Observatory Dr · 핀 클릭 시 상세 정보</div>
+
+    <div class="legend">
+      <div class="row"><div class="pin-school" style="width:18px;height:18px;font-size:10px;border-width:2px;">🎓</div> <b>통학지</b></div>
+      <div class="row"><div class="dot" style="background:#f59e0b;"></div> <b style="color:#b45309;">⭐ 강추</b> (사이즈·가격 균형)</div>
+      <div class="row"><div class="dot" style="background:#2563eb;"></div> 무난한 옵션</div>
+      <div class="row"><div class="dot" style="background:#dc2626;"></div> 주의 (예산초과/좁음/통학 멈)</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn active" data-filter="all">전체</button>
+      <button class="btn" data-filter="gold">⭐ 강추</button>
+      <button class="btn" data-filter="1bedroom">1BR</button>
+      <button class="btn" data-filter="furnished">Furnished</button>
+      <button class="btn" data-filter="gym">헬스장</button>
+    </div>
+
+    <div id="list"></div>
+
+    <div style="font-size:11px; color:var(--muted); margin-top:12px; padding:8px; background:var(--card); border-radius:6px; border:1px solid var(--border);">
+      💡 <b>공유법</b>: 이 HTML 파일을 그대로 이메일/Slack/구글드라이브로 보내거나, <a href="https://app.netlify.com/drop" target="_blank">app.netlify.com/drop</a> 에 드래그&드롭하면 즉시 공유 URL이 나와요.
+    </div>
+  </div>
+</div>
+
+<script>
+const SOIL = { lat: 43.07636, lng: -89.41258, name: "Dept. of Soil Science", addr: "1525 Observatory Dr, Madison, WI 53706" };
+
+const apts = [
+  {
+    n: 1, name: "Lark at Randall", addr: "1423 Monroe St, Madison, WI 53711",
+    lat: 43.06800, lng: -89.40900,
+    types: [
+      { type: "Studio", rent: "$1,699", size: "400 sqft" },
+      { type: "1 Bedroom", rent: "$1,899", size: "550 sqft" }
+    ],
+    walk: 13, bike: 4, bus: 12,
+    furnished: true, internet: true, gym: true, laundry: true,
+    note: "캠퍼스(Camp Randall) 옆, 자전거 4분 = 최단거리. 스튜디오는 400sqft로 좁음.",
+    review: "방음 약하다는 후기, 연 $200 admin fee 별도",
+    vibe: "Monroe Street 라인 — 도보 5분 내 카페·식당·서점·부티크 가득",
+    nearby: ["Bloom Bake Shop", "Pizza Brutta", "Mickie's Dairy Bar", "Trader Joe's", "Vilas Park", "Lake Wingra", "Camp Randall"],
+    nearbyType: "good",
+    url: "https://larkatrandall.com/",
+    tier: "ok"
+  },
+  {
+    n: 2, name: "The Aberdeen", addr: "437 W Gorham St, Madison, WI 53703",
+    lat: 43.07585, lng: -89.39357,
+    types: [{ type: "1 Bedroom", rent: "$2,050", size: "577–588 sqft" }],
+    walk: 23, bike: 11, bus: 11,
+    furnished: false, internet: true, gym: true, laundry: true,
+    note: "다운타운, 저녁엔 보안 인력 상주. State St 가까움.",
+    review: "여름엔 사무실 인력 줄어듦; 청소·관리 평가는 좋음",
+    vibe: "State Street 윗쪽 — Library Mall 코앞, UW 캠퍼스 진입 빠름",
+    nearby: ["State Street", "Library Mall", "Memorial Union", "Lakeshore Path"],
+    nearbyType: "good",
+    url: "https://www.liveataberdeen.com/floor-plans",
+    tier: "ok"
+  },
+  {
+    n: 3, name: "Axton Madison", addr: "750 Regent St, Madison, WI 53715 ⚠",
+    lat: 43.06820, lng: -89.39955,
+    types: [{ type: "1 Bedroom", rent: "$2,155", size: "533 sqft" }],
+    walk: 24, bike: 7, bus: 19,
+    furnished: true, internet: false, gym: true, laundry: true,
+    note: "디자인 모던, 직원 친절. ⚠ PDF 주소(531 W Washington)는 오기 — 실제는 750 Regent St.",
+    review: "예산 $2,100 초과 ($2,155); 리뷰 적음",
+    vibe: "Regent Street — 게임데이 바·식당 라인. 경기 있는 날 시끄러움.",
+    nearby: ["Lucky's 1313", "Jordan's Big 10 Pub", "Butterbird", "Sconniebar", "Kosharie", "The Show 608"],
+    nearbyType: "good",
+    url: "https://axtonmadison.com/floorplan/1br-1ba-the-one-a/",
+    tier: "warn"
+  },
+  {
+    n: 4, name: "New Langdon", addr: "128 Langdon St, Madison, WI 53703",
+    lat: 43.07684, lng: -89.39510,
+    types: [
+      { type: "Studio", rent: "$1,680", size: "603 sqft" },
+      { type: "1 Bedroom", rent: "$1,775", size: "677 sqft" }
+    ],
+    walk: 27, bike: 11, bus: 17,
+    furnished: true, internet: true, gym: false, laundry: true,
+    note: "★ 1BR 가성비 1등 ($1,775 / 677sqft). 신축 2026 첫입주, Steve Brown(45년 운영, Google 4.4).",
+    review: "후기 아직 없음(첫입주). 운영사 평판은 탄탄.",
+    vibe: "⚠ Langdon Street = UW Greek Row(프랫·소로리티). UW 음주 사이트 1위, 주말 파티·소음 보고 多. 본인 그라드 스튜던트 라이프스타일에 맞을지 체크.",
+    nearby: ["Memorial Union", "State Street", "Library Mall", "Lakeshore Path", "Bascom Hill"],
+    nearbyType: "warn",
+    url: "https://newlangdon.stevebrownapts.com/",
+    tier: "gold"
+  },
+  {
+    n: 5, name: "Ovation 309", addr: "309 W Johnson St, Madison, WI 53703",
+    lat: 43.07410, lng: -89.38935,
+    types: [{ type: "Studio", rent: "$1,970", size: "574 sqft" }],
+    walk: 27, bike: 10, bus: 15,
+    furnished: false, internet: false, gym: true, laundry: true,
+    note: "13층 럭셔리 (2015년), Capitol Square 근처. floor-to-ceiling 창문.",
+    review: "99% 항상 만실 — 자리 잡기 어려움. 평점 매우 좋음.",
+    vibe: "State Street 상단 + Capitol Square — 다운타운 활동 풀세트",
+    nearby: ["State Street", "Capitol Square", "Ian's Pizza", "Cooper's Tavern", "The Old Fashioned", "Farmers' Market"],
+    nearbyType: "good",
+    url: "https://ovation309.com/madison-luxury-apartment-floor-plans/",
+    tier: "ok"
+  },
+  {
+    n: 6, name: "Avenir Apartments", addr: "510 W Washington Ave, Madison, WI 53703",
+    lat: 43.07090, lng: -89.39055,
+    types: [{ type: "Studio", rent: "$1,690", size: "467 sqft" }],
+    walk: 28, bike: 8, bus: 10,
+    furnished: false, internet: true, gym: true, laundry: true,
+    note: "2023 신축, 6층 96유닛. 유지보수 응답 10–15분.",
+    review: "사이즈 작음(467sqft). 위치·관리는 호평. Bcycle 2블록.",
+    vibe: "Capitol Square 근처. 버스 정류장 건물 앞, Center Market 그로서리 2블록.",
+    nearby: ["Capitol Square", "State Street", "Center Market", "Bcycle Station"],
+    nearbyType: "good",
+    url: "https://www.kellerrealestategroup.com/properties/residential/avenir/",
+    tier: "warn"
+  },
+  {
+    n: 7, name: "Virtue", addr: "531 W Washington Ave, Madison, WI 53703",
+    lat: 43.07080, lng: -89.39160,
+    types: [{ type: "Studio", rent: "$1,745", size: "524 sqft" }],
+    walk: 30, bike: 9, bus: 17,
+    furnished: false, internet: false, gym: true, laundry: true,
+    note: "2025 최신축, 6층 140유닛. 풀사이즈 in-unit W/D.",
+    review: "헬스장 작다는 후기. 건물은 조용함.",
+    vibe: "Avenir 옆 — 같은 W Washington 라인. Capitol Square 근접.",
+    nearby: ["Capitol Square", "State Street", "Center Market"],
+    nearbyType: "good",
+    url: "https://www.virtuemadison.com/floorplans/",
+    tier: "ok"
+  },
+  {
+    n: 8, name: "306 West", addr: "306 W Main St, Madison, WI 53703",
+    lat: 43.07466, lng: -89.38770,
+    types: [{ type: "1 Bedroom", rent: "$2,030", size: "847 sqft" }],
+    walk: 34, bike: 12, bus: 17,
+    furnished: false, internet: false, gym: true, laundry: true,
+    note: "★ 사이즈 1등 (847sqft). 콘도급 마감(화강암·스테인리스), Lake Monona 뷰. 11층.",
+    review: "자연광 호평, 관리 응답 빠름, 위치·뷰 모두 우수.",
+    vibe: "Capitol Square 2블록 — 다운타운 음식·문화 풀액세스. State St 시끄러움 살짝 떨어짐.",
+    nearby: ["Capitol Square", "State Street", "Lake Monona", "Farmers' Market", "Concourse Hotel"],
+    nearbyType: "good",
+    url: "https://306west.com/availability/",
+    tier: "gold"
+  },
+  {
+    n: 9, name: "The Adria", addr: "179 W Wilson St, Madison, WI 53703",
+    lat: 43.07440, lng: -89.38530,
+    types: [{ type: "Studio", rent: "$1,885", size: "659 sqft" }],
+    walk: 36, bike: 12, bus: 12,
+    furnished: false, internet: false, gym: true, laundry: true,
+    note: "★ 스튜디오 중 최대 사이즈 (659sqft). 풀·사우나·루프탑 데크.",
+    review: "리뷰 적지만 '깨끗·조용·관리 좋음·Apex Property 운영'",
+    vibe: "Capitol Square 호수 쪽 — Monona Terrace, Concourse Hotel 라인. 조용한 다운타운.",
+    nearby: ["Lake Monona", "Capitol Square", "Monona Terrace", "Concourse Hotel"],
+    nearbyType: "good",
+    url: "https://liveadria.com/",
+    tier: "gold"
+  },
+  {
+    n: 10, name: "One 09", addr: "109 E Wilson St, Madison, WI 53703",
+    lat: 43.07458, lng: -89.38180,
+    types: [{ type: "Studio", rent: "$1,809–$1,909", size: "469–494 sqft" }],
+    walk: 42, bike: 13, bus: 22,
+    furnished: false, internet: false, gym: true, laundry: true,
+    note: "14층 신축 럭셔리, Lake Monona 뷰.",
+    review: "ForRent 4.1점. '신축, 시설 좋음, 직원 친절'.",
+    vibe: "Capitol 동쪽, 호수변 — 더 조용한 다운타운. Farmers' Market·Monona Terrace 코앞.",
+    nearby: ["Lake Monona", "Monona Terrace", "Capitol Square", "Farmers' Market"],
+    nearbyType: "good",
+    url: "https://liveone09.com/",
+    tier: "warn"
+  },
+];
+
+const tierLabel = { gold: "⭐ 강추", warn: "⚠ 주의", ok: "무난" };
+const tierBadge = { gold: "gold-badge", warn: "warn-badge", ok: "ok-badge" };
+
+const map = L.map('map').setView([43.0735, -89.398], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap',
+  maxZoom: 19,
+}).addTo(map);
+
+// School marker
+const schoolIcon = L.divIcon({
+  className: '',
+  html: '<div class="pin-school">🎓</div>',
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+});
+L.marker([SOIL.lat, SOIL.lng], { icon: schoolIcon })
+  .addTo(map)
+  .bindPopup(`<div class="pop-title">🎓 ${SOIL.name}</div><div class="pop-addr">${SOIL.addr}</div>`);
+
+function buildPopupHtml(a) {
+  const typesHtml = a.types.map(t => `
+    <div class="pop-row"><b>${t.type}</b><span>${t.rent} · ${t.size}</span></div>
+  `).join('');
+  const amenityTags = [];
+  if (a.furnished) amenityTags.push('<span class="tag good">Furnished</span>'); else amenityTags.push('<span class="tag">Unfurnished</span>');
+  if (a.internet) amenityTags.push('<span class="tag good">인터넷 포함</span>');
+  if (a.gym) amenityTags.push('<span class="tag good">헬스장</span>');
+  if (a.laundry) amenityTags.push('<span class="tag good">In-unit W/D</span>');
+  const nearbyClass = a.nearbyType === 'warn' ? 'warn' : 'good';
+  const nearbyTags = a.nearby.map(p => `<span class="tag ${nearbyClass}">${p}</span>`).join('');
+  return `
+    <div class="pop-title">${a.n}. ${a.name} <span style="font-size:11px;padding:1px 6px;border-radius:8px;" class="${tierBadge[a.tier]}">${tierLabel[a.tier]}</span></div>
+    <div class="pop-addr">${a.addr}</div>
+    ${typesHtml}
+    <div class="pop-row"><b>도보</b><span>${a.walk}분</span></div>
+    <div class="pop-row"><b>자전거</b><span>${a.bike}분</span></div>
+    <div class="pop-row"><b>버스(80)</b><span>${a.bus}분</span></div>
+    <div class="pop-section">
+      <h4>시설</h4>
+      ${amenityTags.join(' ')}
+    </div>
+    <div class="pop-section">
+      <h4>📍 동네 분위기</h4>
+      <div style="font-size:12px; color:#333;">${a.vibe}</div>
+    </div>
+    <div class="pop-section">
+      <h4>🍽️ 주변 (도보권)</h4>
+      ${nearbyTags}
+    </div>
+    <div class="pop-section">
+      <h4>📝 노트</h4>
+      <div style="font-size:12px; color:#333;">${a.note}</div>
+      <div style="font-size:11.5px; color:${a.tier === 'warn' ? '#933' : '#666'}; margin-top:4px;"><i>${a.review}</i></div>
+    </div>
+    <a class="pop-link" href="${a.url}" target="_blank">→ 공식 사이트 열기</a>
+  `;
+}
+
+const tierClass = { gold: 'gold', warn: 'warn', ok: '' };
+const markers = {};
+
+apts.forEach(a => {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="pin-num ${tierClass[a.tier]}">${a.n}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+  const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
+  m.bindPopup(buildPopupHtml(a), { maxWidth: 320, minWidth: 280 });
+  markers[a.n] = m;
+});
+
+const allPoints = apts.map(a => [a.lat, a.lng]).concat([[SOIL.lat, SOIL.lng]]);
+map.fitBounds(allPoints, { padding: [40, 40] });
+
+// Side list
+const list = document.getElementById('list');
+function renderList(filter = 'all') {
+  list.innerHTML = '';
+  apts.forEach(a => {
+    if (filter === 'gold' && a.tier !== 'gold') return;
+    if (filter === '1bedroom' && !a.types.some(t => t.type === '1 Bedroom')) return;
+    if (filter === 'furnished' && !a.furnished) return;
+    if (filter === 'gym' && !a.gym) return;
+
+    const typesStr = a.types.map(t => `${t.type}: ${t.rent} (${t.size})`).join(' / ');
+    const tags = [];
+    if (a.furnished) tags.push('Furnished');
+    if (a.internet) tags.push('인터넷');
+    if (a.gym) tags.push('헬스장');
+
+    const el = document.createElement('div');
+    el.className = 'item' + (a.tier === 'gold' ? ' gold' : '');
+    el.innerHTML = `
+      <div class="name">
+        ${a.n}. ${a.name}
+        <span class="badge ${tierBadge[a.tier]}">${tierLabel[a.tier]}</span>
+      </div>
+      <div class="meta">${a.addr}</div>
+      <div class="meta">💰 ${typesStr}</div>
+      <div class="meta">🚶 ${a.walk}분 · 🚴 ${a.bike}분 · 🚌 ${a.bus}분</div>
+      <div class="meta">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+      <div class="vibe">${a.vibe}</div>
+    `;
+    el.onclick = () => {
+      map.setView([a.lat, a.lng], 16);
+      markers[a.n].openPopup();
+    };
+    list.appendChild(el);
+  });
+}
+renderList();
+
+// Filter buttons
+document.querySelectorAll('.btn[data-filter]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.btn[data-filter]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderList(b.dataset.filter);
+  });
+});
+</script>
+</body>
+</html>
